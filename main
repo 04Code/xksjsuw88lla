@@ -1,0 +1,222 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+
+
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  // This widget is the root of your application.
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      // ),
+      home: MyHomePage(title: 'Pic to Sheet'),
+    );
+  }
+}
+
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key, required this.title});
+
+  final String title;
+
+
+  @override
+  State<MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+
+  File? _imageFile;
+  List<int> extractedIntegers = [];
+
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []); // Hide the overlay
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent // Make status bar transparent
+    ));
+  }
+
+  @override
+  void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+    super.dispose();
+  }
+
+
+  Future<void> _galleryImage() async {
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+      _processImage();
+    }
+  }
+
+  Future<void> _cameraImage() async {
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.camera);
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+      _processImage();
+    }
+  }
+
+
+  Future<void> _processImage() async {
+    final inputImage = InputImage.fromFilePath(_imageFile!.path);
+    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+    final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+    String extractedText = recognizedText.text;
+
+    List<int> newIntegers = processTextForIntegers(extractedText);
+    extractedIntegers.addAll(newIntegers);
+    setState(() {});
+  }
+
+
+  List<int> processTextForIntegers(String text) {
+    // Define all exclusion patterns
+    final exclusionPatterns = [
+      RegExp(r'\bBFS-077\b'),
+      RegExp(r'\bspyrides-082\b'),
+      RegExp(r'\bA.PRATIRIWN-004\b'),
+      RegExp(r'\b004\b'),
+      RegExp(r'\b4\b'),
+    ];
+
+    // Combined regular expression
+    final combinedPattern = RegExp(r'\b(?:' + exclusionPatterns.join('|') + r')\b');
+
+    // Split the text once using all patterns
+    List<String> entries = text.split(combinedPattern);
+
+    // Find integers and apply the filter
+    final intRegExp = RegExp(r'\d+');
+    List<int> foundIntegers = [];
+    for (final entry in entries) {
+      foundIntegers.addAll(intRegExp.allMatches(entry)
+          .map((m) => int.parse(m[0]!))
+          .where((integer) => integer >= 999) // Filter numbers >= 100
+          .toList());
+    }
+    return foundIntegers;
+  }
+
+
+  
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Gas Station Report: Shell 1000'),
+      ),
+      body: Column( // Main Column
+        children: [
+          Expanded(
+            flex: 6,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(5.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Dispenser 1/5', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  const Text('Brand: Wayne'),
+                  const Text('Model: Century'),
+                  const Text('Serial Number: 46-1000001'),
+                  const Text('VR last checked: 2022-01-01', style: TextStyle(fontSize: 16, color: Colors.red, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
+                  const Divider(thickness: 2, color: Colors.blue),
+                  const SizedBox(height: 20),
+                  const Text('Dispenser Data', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  SingleChildScrollView( // Add scrolling for the DataTable
+                    scrollDirection: Axis.horizontal, // Enable horizontal scroll
+                    child: DataTable(
+                      columnSpacing: 20,
+                      columns: const [
+                        DataColumn(label: Text('Index')),
+                        DataColumn(label: Text('Seal Number')),
+                        DataColumn(label: Text('Load Image')),
+                        DataColumn(label: Text('Date')),
+
+                      ],
+                      rows: List.generate(extractedIntegers.length, (index) =>
+                          DataRow(
+                            cells: [
+                              DataCell(Text((index + 1).toString())),
+                              DataCell(Text(extractedIntegers[index].toString(), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold))),
+                              DataCell(TextButton(
+                                onPressed: () {
+                                  // ... Your load image logic ...
+                                },
+                                child: const Text('View Image'),
+                              )),
+                              DataCell(Text(DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now()))),
+                            ],
+                          ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          Expanded(
+            flex: 1,
+              child: Row(
+                children: [
+                  FloatingActionButton.extended(
+                    onPressed: _galleryImage,
+                    label: const Text('email'),
+                    icon: const Icon(Icons.send),
+                    backgroundColor: Colors.purple,
+                  ),
+                  FloatingActionButton.extended(
+                    onPressed: _galleryImage,
+                    label: const Text('Gallery'),
+                    icon: const Icon(Icons.photo_library),
+                    backgroundColor: Colors.blue,
+                  ),
+                  FloatingActionButton.extended(
+                    onPressed: _cameraImage,
+                    label: const Text('Camera'),
+                    icon: const Icon(Icons.camera_alt),
+                    backgroundColor: Colors.green,
+                  ),
+                ],
+          )),
+          // Button Row (Positioned outside the scrollable area)
+
+
+
+        ],
+      ),
+    );
+
+
+
+
+  }
+}
+
+class ImageScreen {
+}
