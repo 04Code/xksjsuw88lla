@@ -185,7 +185,7 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Row(
                 children: [
                   FloatingActionButton.extended(
-                    onPressed: _galleryImage,
+                    onPressed: _sendemail,
                     label: const Text('email'),
                     icon: const Icon(Icons.send),
                     backgroundColor: Colors.purple,
