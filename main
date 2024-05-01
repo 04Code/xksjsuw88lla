@@ -1,0 +1,358 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
+
+
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  // This widget is the root of your application.
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      // ),
+      home: MyHomePage(title: 'Pic to Sheet'),
+    );
+  }
+}
+
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key, required this.title});
+
+  final String title;
+
+
+  @override
+  State<MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+
+  File? _imageFile;
+  List<int> extractedIntegers = [];
+
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []); // Hide the overlay
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent // Make status bar transparent
+    ));
+  }
+
+  @override
+  void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+    super.dispose();
+  }
+
+
+  Future<void> _galleryImage() async {
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+      _processImage();
+    }
+  }
+
+  Future<void> _cameraImage() async {
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.camera);
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+      _processImage();
+    }
+  }
+
+
+
+
+  Future<void> _processImage() async {
+    final inputImage = InputImage.fromFilePath(_imageFile!.path);
+    final recognizedText = await TextRecognizer(script: TextRecognitionScript.latin).processImage(inputImage);
+
+    final extractedIntegers = processTextForIntegers(recognizedText.text);
+
+    for (int integer in extractedIntegers) {
+      final shouldSave = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          // title: const Text('Confirm Integer'), // You can remove the title if desired
+          content: Text('$integer', style: const TextStyle(fontSize: 50, fontWeight: FontWeight.bold, color: Colors.indigo)),
+          actions: [
+            // 'NO' Button
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+              onPressed: () => Navigator.pop(context, false), // No
+              child: const Text('No', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+            ),
+            // Spacer to push 'YES' to the right
+            const Spacer(),
+            // 'YES' Button
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              onPressed: () => Navigator.pop(context, true), // Yes
+              child: const Text('Yes', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+            ),
+          ],
+          actionsAlignment: MainAxisAlignment.spaceBetween, // Align buttons left and right
+        ),
+
+      );
+
+      if (shouldSave ?? false) {
+        setState(() {
+          this.extractedIntegers.add(integer); // Add individually
+        });
+      }
+    }
+  }
+
+
+  List<int> processTextForIntegers(String text) {
+    final exclusionRegex = RegExp(r'\b(?:BFS-077|spyrides-082|A\.PRATIRIWN-004|004|4|7144)\b');
+    final intRegex = RegExp(r'\d{3,}'); // Find integers with at least 3 digits
+
+    return text
+        .split(exclusionRegex)
+        .expand((entry) => intRegex.allMatches(entry).map((m) => int.parse(m[0]!)))
+        .toList();
+  }
+
+
+
+
+  int? _editingIndex; // Index of the integer being edited
+  int? _tempIntegerValue;
+
+  // ... existing methods (_galleryImage, _cameraImage, _processImage)
+
+  void _startEditing(int index) {
+    setState(() {
+      _editingIndex = index;
+      _tempIntegerValue = extractedIntegers[index];
+    });
+  }
+
+  void _updateTempValue(String newValue) {
+    setState(() {
+      final controller = TextEditingController(text: _tempIntegerValue.toString());
+      _tempIntegerValue = int.tryParse(newValue);
+
+      // Calculate desired cursor position
+      int newCursorPosition = controller.selection.baseOffset;
+      if (newValue.length > _tempIntegerValue.toString().length) {
+        // If a digit was added, move cursor to the end
+        newCursorPosition = newValue.length;
+      }
+
+      // Update the controller with the new selection
+      controller.text = newValue;
+      controller.selection = TextSelection.fromPosition(TextPosition(offset: newCursorPosition));
+    });
+  }
+
+  void _saveChanges() {
+    if (_editingIndex != null && _tempIntegerValue != null) {
+      setState(() {
+        extractedIntegers[_editingIndex!] = _tempIntegerValue!;
+        _editingIndex = null;
+        _tempIntegerValue = null;
+      });
+    }
+  }
+
+
+
+
+  
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+
+      body: Column( // Main Column
+        children: [
+          Expanded(
+            flex: 6,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(5.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center, // Optionally center the content
+                    children: [
+                      const Text('Dispenser 1/5', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 20), // Add some spacing
+                      ElevatedButton(
+                        onPressed: () {
+                          // Your action here
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                        ),
+                        child: const Text('Scan'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Divider(thickness: 2, color: Colors.blue),
+                  const SizedBox(height: 10),
+                  SingleChildScrollView( // Add scrolling for the DataTable
+                    scrollDirection: Axis.horizontal, // Enable horizontal scroll
+                    child: DataTable(
+                      columnSpacing: 20,
+                      headingRowHeight: 40,
+                      dataRowHeight: 60,
+                      columns: const [
+                        DataColumn(label: Center(child: Text('Index'))), // Centered
+                        DataColumn(label: Center(child: Text('Seal Number', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)))), // Centered
+                        DataColumn(label: Center(child: Text('Load Image'))), // Centered
+                      ],
+                      rows: List.generate(extractedIntegers.length, (index) =>
+                          DataRow(
+                            cells: [
+                              DataCell(Center(child: Text((index + 1).toString()))),
+
+
+                              DataCell(
+                                _editingIndex == index
+                                    ? TextField(
+                                  controller: TextEditingController(text: _tempIntegerValue.toString())
+                                    ..selection = TextSelection.fromPosition(
+                                      TextPosition(offset: _tempIntegerValue.toString().length),
+                                    ), // Set cursor at the end
+                                  onChanged: _updateTempValue,
+                                  onEditingComplete: _saveChanges,
+                                //  autofocus: true,
+                                  focusNode: FocusNode(),
+                                  keyboardType: TextInputType.number,
+                                  style: const TextStyle(fontSize: 50, fontWeight: FontWeight.w500, color: Colors.red),
+                                )
+                                    : GestureDetector(
+                                  onTap: () => _startEditing(index),
+                                  child: Center(child: Text(extractedIntegers[index].toString(), style: const TextStyle(fontSize: 50, fontWeight: FontWeight.w500))),
+                                ),
+                              ),
+
+
+
+
+
+
+
+
+                              DataCell(ElevatedButton( // Use ElevatedButton for better visual clarity
+                                onPressed: () {
+                                  // Your load image logic
+                                },
+                                child: const Text('View Image'),
+                              )),
+                            ],
+                          ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          Expanded(
+            flex: 1,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Distribute evenly
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    _sendEmail(context);
+                  },
+                  label: const Text('email'),
+                  icon: const Icon(Icons.send),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.amberAccent,
+                    padding: const EdgeInsets.all(20),
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _galleryImage,
+                  label: const Text('Gallery'),
+                  icon: const Icon(Icons.photo_library),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    padding: const EdgeInsets.all(20),
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _cameraImage,
+                  label: const Text('scan'), // Changed from 'Camera'
+                  icon: const Icon(Icons.camera_alt),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepOrangeAccent,
+                    padding: const EdgeInsets.all(20),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+
+
+        ],
+      ),
+    );
+
+
+
+
+  }
+
+
+
+  void _sendEmail(BuildContext context) { // Include context & DataTable
+    final _emailController = TextEditingController();
+   // _sendEmail(context, myDataTable);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Email'),
+          content: TextField(
+            controller: _emailController,
+            decoration: const InputDecoration(hintText: 'Enter email address'),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Send'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                //   _sendEmailTo(_emailController.text, dataTable); // Pass the DataTable
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+}
